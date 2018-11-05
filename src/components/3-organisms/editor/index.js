@@ -36,11 +36,14 @@ class Editor extends Component {
     };
     this._container = React.createRef();
     this._onDrop = this._onDrop.bind(this);
+    this._makeNode = this._makeNode.bind(this);
+    this._removeNode = this._removeNode.bind(this);
     this._movingStart = this._movingStart.bind(this);
     this._moving = this._moving.bind(this);
     this._movingEnd = this._movingEnd.bind(this);
     this._connectStart = this._connectStart.bind(this);
     this._connect = this._connect.bind(this);
+    this._disconnect = this._disconnect.bind(this);
     this._connectEnd = this._connectEnd.bind(this);
     this._changeNodeName = this._changeNodeName.bind(this);
     this._onMouseMoveSvg = this._onMouseMoveSvg.bind(this);
@@ -49,6 +52,7 @@ class Editor extends Component {
     this._onClickSvg = this._onClickSvg.bind(this);
     this._onClickPath = this._onClickPath.bind(this);
     this._onClickNodeItem = this._onClickNodeItem.bind(this);
+    this._onKeyDownContainer = this._onKeyDownContainer.bind(this);
   }
 
   render() {
@@ -66,6 +70,7 @@ class Editor extends Component {
       _onClickSvg,
       _onClickPath,
       _onClickNodeItem,
+      _onKeyDownContainer,
       state: { allNodeIds, nodesById, activePath, activeNode },
     } = this;
     const connects = allNodeIds
@@ -98,9 +103,11 @@ class Editor extends Component {
     return (
       <div
         ref={_container}
-        style={{ width: 0, flexGrow: 1, display: 'flex' }}
+        style={{ width: 0, flexGrow: 1, display: 'flex', outline: '0 none' }}
+        tabIndex="0"
         onDragOver={_onDragOver}
         onDrop={_onDrop}
+        onKeyDown={_onKeyDownContainer}
       >
         <svg
           style={{ width: 0, flexGrow: 1 }}
@@ -199,6 +206,42 @@ class Editor extends Component {
     console.log('[NODE] make');
   }
 
+  _removeNode(id) {
+    this.setState(
+      ({
+        allNodeIds,
+        nodesById: { [id]: deleted, ...restNodesById },
+        activeNode,
+      }) => {
+        const filteredIds = allNodeIds.filter(nodeId => nodeId !== id);
+        const connectedNodeIds = filteredIds.filter(nodeId => {
+          const node = restNodesById[nodeId];
+          return node.connects.find(
+            connect => connect.fromNodeId === id || connect.toNodeId === id,
+          );
+        });
+        const disconnectNodes = connectedNodeIds.reduce((nodes, nodeId) => {
+          const node = restNodesById[nodeId];
+          return {
+            ...nodes,
+            [nodeId]: {
+              ...node,
+              connects: node.connects.filter(
+                connect => connect.fromNodeId !== id && connect.toNodeId !== id,
+              ),
+            },
+          };
+        }, {});
+        return {
+          activeNode: activeNode === id ? null : activeNode,
+          allNodeIds: filteredIds,
+          nodesById: { ...restNodesById, ...disconnectNodes },
+        };
+      },
+    );
+    console.log('[NODE] remove');
+  }
+
   _movingStart(id) {
     this.setState({ movingId: id });
   }
@@ -259,6 +302,28 @@ class Editor extends Component {
     console.log('[NODE] connect');
   }
 
+  _disconnect(fromNodeId, fromOutIdx, toNodeId, toInIdx) {
+    const {
+      state: { nodesById },
+    } = this;
+    const node = nodesById[toNodeId];
+    if (!node) return;
+    const deleteConnectNode = {
+      ...node,
+      connects: node.connects.filter(
+        connect =>
+          connect.fromNodeId !== fromNodeId ||
+          connect.fromOutIdx !== fromOutIdx ||
+          connect.toNodeId !== toNodeId ||
+          connect.toInIdx !== toInIdx,
+      ),
+    };
+    this.setState(({ nodesById }) => ({
+      nodesById: { ...nodesById, [toNodeId]: deleteConnectNode },
+    }));
+    console.log('[NODE] disconnect');
+  }
+
   _connectEnd() {
     this.setState({ connectNodeId: null, connectOutIdx: null });
   }
@@ -311,6 +376,23 @@ class Editor extends Component {
       activePath: `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`,
       activeNode: null,
     });
+  }
+
+  _onKeyDownContainer({ keyCode }) {
+    const {
+      _removeNode,
+      _disconnect,
+      state: { activeNode, activePath },
+    } = this;
+    if (keyCode === 46 && activeNode) {
+      return _removeNode(activeNode);
+    }
+    if (keyCode === 46 && activePath) {
+      const [fromNodeId, fromOutIdx, toNodeId, toInIdx] = activePath
+        .split(',')
+        .map((v, i) => (i % 2 === 1 ? parseInt(v, 10) : v));
+      _disconnect(fromNodeId, fromOutIdx, toNodeId, toInIdx);
+    }
   }
 }
 
