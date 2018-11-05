@@ -13,6 +13,27 @@ class Navigation extends Component {
         >
           Node(1, 1)
         </NavigationItem>
+        <NavigationItem
+          data-inout-count="21"
+          draggable
+          onDragStart={_onDragStart}
+        >
+          Node(2, 1)
+        </NavigationItem>
+        <NavigationItem
+          data-inout-count="12"
+          draggable
+          onDragStart={_onDragStart}
+        >
+          Node(1, 2)
+        </NavigationItem>
+        <NavigationItem
+          data-inout-count="22"
+          draggable
+          onDragStart={_onDragStart}
+        >
+          Node(2, 2)
+        </NavigationItem>
       </div>
     );
   }
