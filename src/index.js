@@ -2,6 +2,7 @@ import React, { Fragment } from 'react';
 import ReactDOM from 'react-dom';
 import { createGlobalStyle } from 'styled-components';
 import reset from 'styled-reset';
+import ManySvgNode from './components/4-pages/many-svg-node';
 import * as serviceWorker from './serviceWorker';
 
 const GlobalStyle = createGlobalStyle`
@@ -13,7 +14,7 @@ const GlobalStyle = createGlobalStyle`
 
 ReactDOM.render(
   <Fragment>
-    <div>Hello World</div>
+    <ManySvgNode rowCount={100} colCount={16} />
     <GlobalStyle />
   </Fragment>,
   document.getElementById('root'),
