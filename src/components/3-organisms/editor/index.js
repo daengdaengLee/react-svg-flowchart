@@ -1,25 +1,13 @@
 import React, { Component } from 'react';
 import NodeItem from '../../2-molecules/node-item';
 
-const _calcPath = ({
-  fromNodeX,
-  fromNodeY,
-  fromOutCount,
-  fromOutIdx,
-  toNodeX,
-  toNodeY,
-  toInCount,
-  toInIdx,
-}) => {
-  const fromX = fromNodeX + (140 / (fromOutCount + 1)) * (fromOutIdx + 1);
-  const fromY = fromNodeY + 60;
-  const toX = toNodeX + (140 / (toInCount + 1)) * (toInIdx + 1);
-  const toY = toNodeY;
+const _calcPath = (fromX, fromY, toX, toY) => {
+  const middleX = (fromX + toX) / 2;
+  const y1 = fromY * 1.5 - toY * 0.5;
+  const y2 = toY * 1.5 - fromY * 0.5;
   return fromY < toY
     ? `M ${fromX} ${fromY} C ${fromX} ${toY}, ${toX} ${fromY}, ${toX} ${toY}`
-    : `M ${fromX} ${fromY} C ${(fromX + toX) / 2} ${fromY * 1.5 -
-        toY * 0.5}, ${(fromX + toX) / 2} ${toY * 1.5 -
-        fromY * 0.5}, ${toX} ${toY}`;
+    : `M ${fromX} ${fromY} C ${middleX} ${y1}, ${middleX} ${y2}, ${toX} ${toY}`;
 };
 
 class Editor extends Component {
@@ -66,6 +54,7 @@ class Editor extends Component {
   render() {
     const {
       _container,
+      _calcConnectPath,
       _calcPreviewPath,
       _onDragOver,
       _onDrop,
@@ -141,7 +130,7 @@ class Editor extends Component {
               key={`${connect.fromNodeId},${connect.fromOutIdx},${
                 connect.toNodeId
               },${connect.toInIdx}`}
-              d={_calcPath(connect)}
+              d={_calcConnectPath(connect)}
               stroke={
                 activePaths.includes(
                   `${connect.fromNodeId},${connect.fromOutIdx},${
@@ -215,23 +204,36 @@ class Editor extends Component {
     );
   }
 
+  _calcConnectPath({
+    fromNodeX,
+    fromNodeY,
+    fromOutCount,
+    fromOutIdx,
+    toNodeX,
+    toNodeY,
+    toInCount,
+    toInIdx,
+  }) {
+    const fromX = fromNodeX + (140 / (fromOutCount + 1)) * (fromOutIdx + 1);
+    const fromY = fromNodeY + 60;
+    const toX = toNodeX + (140 / (toInCount + 1)) * (toInIdx + 1);
+    const toY = toNodeY;
+    return _calcPath(fromX, fromY, toX, toY);
+  }
+
   _calcPreviewPath() {
     const {
       connectNodeId: fromNodeId,
       connectOutIdx: fromOutIdx,
       nodesById,
-      posX,
-      posY,
+      posX: toX,
+      posY: toY,
     } = this.state;
     const node = nodesById[fromNodeId];
     if (!node) return 'M 0, 0';
     const fromX = node.x + (140 / (node.outCount + 1)) * (fromOutIdx + 1);
     const fromY = node.y + 60;
-    return fromY < posY
-      ? `M ${fromX} ${fromY} C ${fromX} ${posY}, ${posX} ${fromY}, ${posX} ${posY}`
-      : `M ${fromX} ${fromY} C ${(fromX + posX) / 2} ${fromY * 1.5 -
-          posY * 0.5}, ${(fromX + posX) / 2} ${posY * 1.5 -
-          fromY * 0.5}, ${posX} ${posY}`;
+    return _calcPath(fromX, fromY, toX, toY);
   }
 
   _onDragOver(evt) {
