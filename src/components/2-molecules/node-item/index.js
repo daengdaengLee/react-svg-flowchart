@@ -38,15 +38,20 @@ class NodeItem extends Component {
           cursor="pointer"
           onMouseDown={() => onMouseDownNode(id)}
         />
-        <text
-          textAnchor="middle"
-          alignmentBaseline="middle"
-          style={{ userSelect: 'none' }}
-          x="70"
-          y="30"
-        >
-          {name}
-        </text>
+        <foreignObject x="10" y="20" width="140" height="20">
+          <div
+            style={{
+              width: '120px',
+              height: '20px',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              textAlign: 'center',
+            }}
+          >
+            {name}
+          </div>
+        </foreignObject>
         {[...Array(inCount)].map((_, i) => (
           <circle
             key={i}
