@@ -141,6 +141,7 @@ class Editor extends Component {
                   ? 'green'
                   : 'black'
               }
+              strokeWidth="2"
               fill="none"
               cursor="pointer"
               onClick={evt =>
@@ -180,6 +181,7 @@ class Editor extends Component {
               d={_calcPreviewPath()}
               fill="none"
               stroke="black"
+              strokeWidth="2"
               strokeDasharray="4 4"
             />
           )}
