@@ -31,6 +31,7 @@ class Editor extends Component {
       movingId: null,
       connectNodeId: null,
       connectOutIdx: null,
+      activePath: null,
     };
     this._container = React.createRef();
     this._onDrop = this._onDrop.bind(this);
@@ -43,6 +44,8 @@ class Editor extends Component {
     this._onMouseMoveSvg = this._onMouseMoveSvg.bind(this);
     this._onMouseUpSvg = this._onMouseUpSvg.bind(this);
     this._onMouseLeaveSvg = this._onMouseLeaveSvg.bind(this);
+    this._onClickSvg = this._onClickSvg.bind(this);
+    this._onClickPath = this._onClickPath.bind(this);
   }
 
   render() {
@@ -56,7 +59,9 @@ class Editor extends Component {
       _onMouseMoveSvg,
       _onMouseUpSvg,
       _onMouseLeaveSvg,
-      state: { allNodeIds, nodesById },
+      _onClickSvg,
+      _onClickPath,
+      state: { allNodeIds, nodesById, activePath },
     } = this;
     const connects = allNodeIds
       .map(id => {
@@ -97,6 +102,7 @@ class Editor extends Component {
           onMouseLeave={_onMouseLeaveSvg}
           onMouseUp={_onMouseUpSvg}
           onMouseMove={_onMouseMoveSvg}
+          onClick={_onClickSvg}
         >
           {connects.map(connect => (
             <path
@@ -104,8 +110,25 @@ class Editor extends Component {
                 connect.toNodeId
               },${connect.toInIdx}`}
               d={_calcPath(connect)}
-              stroke="black"
+              stroke={
+                activePath ===
+                `${connect.fromNodeId},${connect.fromOutIdx},${
+                  connect.toNodeId
+                },${connect.toInIdx}`
+                  ? 'green'
+                  : 'black'
+              }
               fill="none"
+              cursor="pointer"
+              onClick={evt =>
+                _onClickPath(
+                  evt,
+                  connect.fromNodeId,
+                  connect.fromOutIdx,
+                  connect.toNodeId,
+                  connect.toInIdx,
+                )
+              }
             />
           ))}
           {allNodeIds.map(id => {
@@ -243,6 +266,19 @@ class Editor extends Component {
     const { _movingEnd, _connectEnd } = this;
     _movingEnd();
     _connectEnd();
+  }
+
+  _onClickSvg() {
+    this.setState({
+      activePath: null,
+    });
+  }
+
+  _onClickPath(evt, fromNodeId, fromOutIdx, toNodeId, toInIdx) {
+    evt.stopPropagation();
+    this.setState({
+      activePath: `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`,
+    });
   }
 }
 
