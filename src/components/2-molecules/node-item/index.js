@@ -5,45 +5,34 @@ class NodeItem extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      isEditing: false,
       editText: '',
       hover: null,
     };
-    this._onHoverInOut = this._onHoverInOut.bind(this);
-    this._onHoverOut = this._onHoverOut.bind(this);
-    this._onDoubleClickText = this._onDoubleClickText.bind(this);
+    this._onMouseOverInOut = this._onMouseOverInOut.bind(this);
+    this._onMouseLeaveInOut = this._onMouseLeaveInOut.bind(this);
+    this._onMouseDownInOut = this._onMouseDownInOut.bind(this);
+    this._onMouseUpInOut = this._onMouseUpInOut.bind(this);
+    this._onMouseDownNode = this._onMouseDownNode.bind(this);
+    this._onDoubleClickNodeName = this._onDoubleClickNodeName.bind(this);
     this._onChangeEditText = this._onChangeEditText.bind(this);
     this._onKeyDownEditText = this._onKeyDownEditText.bind(this);
   }
 
   render() {
     const {
-      _onHoverInOut,
-      _onHoverOut,
-      _onDoubleClickText,
+      _onMouseOverInOut,
+      _onMouseLeaveInOut,
+      _onMouseDownInOut,
+      _onMouseUpInOut,
+      _onMouseDownNode,
+      _onDoubleClickNodeName,
       _onChangeEditText,
       _onKeyDownEditText,
-      props: {
-        x,
-        y,
-        id,
-        name,
-        active,
-        inCount,
-        outCount,
-        onClickNode,
-        onMouseDownNode,
-        onMouseDownOut,
-        onMouseUpIn,
-      },
-      state: { hover, isEditing, editText },
+      props: { x, y, name, active, editing, inCount, outCount },
+      state: { hover, editText },
     } = this;
     return (
-      <g
-        transform={`translate(${x}, ${y})`}
-        onMouseDown={evt => onMouseDownNode(evt, id)}
-        onClick={evt => onClickNode(evt, id)}
-      >
+      <g transform={`translate(${x}, ${y})`} onMouseDown={_onMouseDownNode}>
         <rect
           width="140"
           height="60"
@@ -52,7 +41,7 @@ class NodeItem extends Component {
           cursor="pointer"
         />
         <foreignObject x="10" y="20" width="140" height="20">
-          {isEditing ? (
+          {editing ? (
             <input
               style={{ width: '120px', border: '0 none', outline: '0 none' }}
               value={editText}
@@ -71,7 +60,7 @@ class NodeItem extends Component {
                 userSelect: 'none',
                 cursor: 'pointer',
               }}
-              onDoubleClick={_onDoubleClickText}
+              onDoubleClick={_onDoubleClickNodeName}
             >
               {name}
             </div>
@@ -80,45 +69,84 @@ class NodeItem extends Component {
         {[...Array(inCount)].map((_, i) => (
           <circle
             key={i}
-            r="4"
+            r="6"
             cx={(140 / (inCount + 1)) * (i + 1)}
             fill={hover === `in_${i}` ? 'green' : 'black'}
             cursor="pointer"
-            onMouseUp={evt => onMouseUpIn(evt, id, i)}
-            onMouseOver={() => _onHoverInOut('in', i)}
-            onMouseLeave={_onHoverOut}
+            onMouseDown={evt => _onMouseDownInOut(evt, 'in', i)}
+            onMouseUp={evt => _onMouseUpInOut(evt, 'in', i)}
+            onMouseOver={() => _onMouseOverInOut('in', i)}
+            onMouseLeave={_onMouseLeaveInOut}
           />
         ))}
         {[...Array(outCount)].map((_, i) => (
           <circle
             key={i}
-            r="4"
+            r="6"
             cx={(140 / (outCount + 1)) * (i + 1)}
             cy="60"
             fill={hover === `out_${i}` ? 'green' : 'black'}
             cursor="pointer"
-            onMouseDown={evt => onMouseDownOut(evt, id, i)}
-            onMouseOver={() => _onHoverInOut('out', i)}
-            onMouseLeave={_onHoverOut}
+            onMouseDown={evt => _onMouseDownInOut(evt, 'out', i)}
+            onMouseUp={evt => _onMouseUpInOut(evt, 'out', i)}
+            onMouseOver={() => _onMouseOverInOut('out', i)}
+            onMouseLeave={_onMouseLeaveInOut}
           />
         ))}
       </g>
     );
   }
 
-  _onHoverInOut(inout, idx) {
+  componentDidUpdate({ editing: prevEditing }) {
+    const { editing: currentEditing, name } = this.props;
+    if (!prevEditing && currentEditing) {
+      this.setState({ editText: name });
+    }
+  }
+
+  _onMouseOverInOut(inout, idx) {
     this.setState({ hover: `${inout}_${idx}` });
   }
 
-  _onHoverOut() {
+  _onMouseLeaveInOut() {
     this.setState({ hover: null });
   }
 
-  _onDoubleClickText() {
+  _onMouseDownInOut(evt, inout, i) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
     const {
-      props: { name },
+      props: { id, name, onMouseDownOut, onChangeNodeName },
     } = this;
-    this.setState({ isEditing: true, editText: name });
+    onChangeNodeName(id, name);
+    inout === 'out' && onMouseDownOut(id, i);
+  }
+
+  _onMouseUpInOut(evt, inout, i) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
+    const {
+      props: { id, onMouseUpIn },
+    } = this;
+    inout === 'in' && onMouseUpIn(id, i);
+  }
+
+  _onMouseDownNode(evt) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
+    const {
+      props: { id, onMouseDownNode },
+    } = this;
+    onMouseDownNode(id, evt.ctrlKey);
+  }
+
+  _onDoubleClickNodeName(evt) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
+    const {
+      props: { id, onDoubleClickNodeName },
+    } = this;
+    onDoubleClickNodeName(id);
   }
 
   _onChangeEditText({ target: { value } }) {
@@ -131,7 +159,6 @@ class NodeItem extends Component {
       props: { id, onChangeNodeName },
       state: { editText },
     } = this;
-    this.setState({ isEditing: false, editText: '' });
     onChangeNodeName(id, editText);
   }
 }
@@ -141,12 +168,13 @@ NodeItem.defaultProps = {
   y: 0,
   name: 'Node',
   active: false,
+  editing: false,
   inCount: 1,
   outCount: 1,
-  onClickNode: (evt, id) => {},
-  onMouseDownNode: (evt, id) => {},
-  onMouseDownOut: (evt, id, outIdx) => {},
-  onMouseUpIn: (evt, id, inIdx) => {},
+  onMouseDownNode: (id, ctrlKey) => {},
+  onMouseDownOut: (id, outIdx) => {},
+  onMouseUpIn: (id, inIdx) => {},
+  onDoubleClickNodeName: id => {},
   onChangeNodeName: (id, name) => {},
 };
 
@@ -156,12 +184,13 @@ NodeItem.propTypes = {
   id: PropTypes.string.isRequired,
   name: PropTypes.string,
   active: PropTypes.bool,
+  editing: PropTypes.bool,
   inCount: PropTypes.number,
   outCount: PropTypes.number,
-  onClickNode: PropTypes.func,
   onMouseDownNode: PropTypes.func,
   onMouseDownOut: PropTypes.func,
   onMouseUpIn: PropTypes.func,
+  onDoubleClickNodeName: PropTypes.func,
   onChangeNodeName: PropTypes.func,
 };
 
