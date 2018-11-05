@@ -1,6 +1,15 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
+const _inoutHoverStart = (inout, idx) => prevState => ({
+  ...prevState,
+  hover: `${inout}_${idx}`,
+});
+
+const _inoutHoverEnd = prevState => ({ ...prevState, hover: null });
+
+const _setEditText = text => prevState => ({ ...prevState, editText: text });
+
 class NodeItem extends Component {
   constructor(props) {
     super(props);
@@ -100,16 +109,16 @@ class NodeItem extends Component {
   componentDidUpdate({ editing: prevEditing }) {
     const { editing: currentEditing, name } = this.props;
     if (!prevEditing && currentEditing) {
-      this.setState({ editText: name });
+      this.setState(_setEditText(name));
     }
   }
 
   _onMouseOverInOut(inout, idx) {
-    this.setState({ hover: `${inout}_${idx}` });
+    this.setState(_inoutHoverStart(inout, idx));
   }
 
   _onMouseLeaveInOut() {
-    this.setState({ hover: null });
+    this.setState(_inoutHoverEnd);
   }
 
   _onMouseDownInOut(evt, inout, i) {
@@ -150,7 +159,7 @@ class NodeItem extends Component {
   }
 
   _onChangeEditText({ target: { value } }) {
-    this.setState({ editText: value });
+    this.setState(_setEditText(value));
   }
 
   _onKeyDownEditText({ keyCode }) {
