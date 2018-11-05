@@ -5,16 +5,24 @@ class NodeItem extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      isEditing: false,
+      editText: '',
       hover: null,
     };
     this._onHoverInOut = this._onHoverInOut.bind(this);
     this._onHoverOut = this._onHoverOut.bind(this);
+    this._onDoubleClickText = this._onDoubleClickText.bind(this);
+    this._onChangeEditText = this._onChangeEditText.bind(this);
+    this._onKeyDownEditText = this._onKeyDownEditText.bind(this);
   }
 
   render() {
     const {
       _onHoverInOut,
       _onHoverOut,
+      _onDoubleClickText,
+      _onChangeEditText,
+      _onKeyDownEditText,
       props: {
         x,
         y,
@@ -26,7 +34,7 @@ class NodeItem extends Component {
         onMouseDownOut,
         onMouseUpIn,
       },
-      state: { hover },
+      state: { hover, isEditing, editText },
     } = this;
     return (
       <g transform={`translate(${x}, ${y})`}>
@@ -39,18 +47,28 @@ class NodeItem extends Component {
           onMouseDown={() => onMouseDownNode(id)}
         />
         <foreignObject x="10" y="20" width="140" height="20">
-          <div
-            style={{
-              width: '120px',
-              height: '20px',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              textAlign: 'center',
-            }}
-          >
-            {name}
-          </div>
+          {isEditing ? (
+            <input
+              style={{ width: '120px', border: '0 none', outline: '0 none' }}
+              value={editText}
+              onChange={_onChangeEditText}
+              onKeyDown={_onKeyDownEditText}
+            />
+          ) : (
+            <div
+              style={{
+                width: '120px',
+                height: '20px',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                textAlign: 'center',
+              }}
+              onDoubleClick={_onDoubleClickText}
+            >
+              {name}
+            </div>
+          )}
         </foreignObject>
         {[...Array(inCount)].map((_, i) => (
           <circle
@@ -88,6 +106,27 @@ class NodeItem extends Component {
   _onHoverOut() {
     this.setState({ hover: null });
   }
+
+  _onDoubleClickText() {
+    const {
+      props: { name },
+    } = this;
+    this.setState({ isEditing: true, editText: name });
+  }
+
+  _onChangeEditText({ target: { value } }) {
+    this.setState({ editText: value });
+  }
+
+  _onKeyDownEditText({ keyCode }) {
+    if (keyCode !== 13) return;
+    const {
+      props: { id, onChangeNodeName },
+      state: { editText },
+    } = this;
+    this.setState({ isEditing: false, editText: '' });
+    onChangeNodeName(id, editText);
+  }
 }
 
 NodeItem.defaultProps = {
@@ -99,6 +138,7 @@ NodeItem.defaultProps = {
   onMouseDownNode: id => {},
   onMouseDownOut: (id, outIdx) => {},
   onMouseUpIn: (id, inIdx) => {},
+  onChangeNodeName: (id, name) => {},
 };
 
 NodeItem.propTypes = {
@@ -111,6 +151,7 @@ NodeItem.propTypes = {
   onMouseDownNode: PropTypes.func,
   onMouseDownOut: PropTypes.func,
   onMouseUpIn: PropTypes.func,
+  onChangeNodeName: PropTypes.func,
 };
 
 export default NodeItem;

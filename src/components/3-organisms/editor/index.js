@@ -41,6 +41,7 @@ class Editor extends Component {
     this._connectStart = this._connectStart.bind(this);
     this._connect = this._connect.bind(this);
     this._connectEnd = this._connectEnd.bind(this);
+    this._changeNodeName = this._changeNodeName.bind(this);
     this._onMouseMoveSvg = this._onMouseMoveSvg.bind(this);
     this._onMouseUpSvg = this._onMouseUpSvg.bind(this);
     this._onMouseLeaveSvg = this._onMouseLeaveSvg.bind(this);
@@ -56,6 +57,7 @@ class Editor extends Component {
       _movingStart,
       _connectStart,
       _connect,
+      _changeNodeName,
       _onMouseMoveSvg,
       _onMouseUpSvg,
       _onMouseLeaveSvg,
@@ -137,6 +139,7 @@ class Editor extends Component {
               <NodeItem
                 key={id}
                 id={id}
+                name={node.name}
                 x={node.x}
                 y={node.y}
                 inCount={node.inCount}
@@ -144,6 +147,7 @@ class Editor extends Component {
                 onMouseDownNode={_movingStart}
                 onMouseDownOut={_connectStart}
                 onMouseUpIn={_connect}
+                onChangeNodeName={_changeNodeName}
               />
             );
           })}
@@ -176,6 +180,7 @@ class Editor extends Component {
     const id = `${Date.now()}`;
     const node = {
       id,
+      name: 'node',
       x,
       y,
       inCount,
@@ -249,6 +254,18 @@ class Editor extends Component {
 
   _connectEnd() {
     this.setState({ connectNodeId: null, connectOutIdx: null });
+  }
+
+  _changeNodeName(id, name) {
+    this.setState(({ nodesById }) => {
+      const node = nodesById[id];
+      return {
+        nodesById: {
+          ...nodesById,
+          [id]: { ...node, name },
+        },
+      };
+    });
   }
 
   _onMouseMoveSvg({ movementX, movementY }) {
