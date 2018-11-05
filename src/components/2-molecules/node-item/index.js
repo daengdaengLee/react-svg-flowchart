@@ -37,14 +37,16 @@ class NodeItem extends Component {
       state: { hover, isEditing, editText },
     } = this;
     return (
-      <g transform={`translate(${x}, ${y})`}>
+      <g
+        transform={`translate(${x}, ${y})`}
+        onMouseDown={() => onMouseDownNode(id)}
+      >
         <rect
           width="140"
           height="60"
           fill="#ffffff"
           stroke="black"
           cursor="pointer"
-          onMouseDown={() => onMouseDownNode(id)}
         />
         <foreignObject x="10" y="20" width="140" height="20">
           {isEditing ? (
@@ -63,6 +65,8 @@ class NodeItem extends Component {
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
                 textAlign: 'center',
+                userSelect: 'none',
+                cursor: 'pointer',
               }}
               onDoubleClick={_onDoubleClickText}
             >
