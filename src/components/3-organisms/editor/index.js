@@ -524,6 +524,19 @@ class Editor extends Component {
           _disconnect(fromNodeId, fromOutIdx, toNodeId, toInIdx),
         );
     }
+    if (keyCode === 27) {
+      this.setState({
+        movingId: null,
+        connectNodeId: null,
+        connectOutIdx: null,
+        activePaths: [],
+        activeNodes: [],
+        posX: 0,
+        posY: 0,
+        selectionX: null,
+        selectionY: null,
+      });
+    }
   }
 }
 
