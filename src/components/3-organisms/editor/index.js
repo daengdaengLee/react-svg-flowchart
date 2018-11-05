@@ -31,7 +31,7 @@ class Editor extends Component {
       movingId: null,
       connectNodeId: null,
       connectOutIdx: null,
-      activePath: null,
+      activePaths: [],
       activeNodes: [],
       posX: 0,
       posY: 0,
@@ -83,7 +83,7 @@ class Editor extends Component {
       state: {
         allNodeIds,
         nodesById,
-        activePath,
+        activePaths,
         activeNodes,
         connectNodeId,
         connectOutIdx,
@@ -143,10 +143,11 @@ class Editor extends Component {
               },${connect.toInIdx}`}
               d={_calcPath(connect)}
               stroke={
-                activePath ===
-                `${connect.fromNodeId},${connect.fromOutIdx},${
-                  connect.toNodeId
-                },${connect.toInIdx}`
+                activePaths.includes(
+                  `${connect.fromNodeId},${connect.fromOutIdx},${
+                    connect.toNodeId
+                  },${connect.toInIdx}`,
+                )
                   ? 'green'
                   : 'black'
               }
@@ -443,7 +444,7 @@ class Editor extends Component {
       _container: { current: containerEl },
       _selectStart,
     } = this;
-    this.setState({ activePath: null, activeNodes: [] });
+    this.setState({ activePaths: [], activeNodes: [] });
     if (!containerEl) return;
     const { offsetLeft, offsetTop } = containerEl;
     const x = clientX - offsetLeft;
@@ -491,31 +492,37 @@ class Editor extends Component {
   _onClickNodeItem(evt, id) {
     evt.nativeEvent.stopImmediatePropagation();
     evt.stopPropagation();
-    this.setState({ activePath: null, activeNodes: [id] });
+    this.setState({ activePaths: [], activeNodes: [id] });
   }
 
   _onClickPath(evt, fromNodeId, fromOutIdx, toNodeId, toInIdx) {
     evt.stopPropagation();
-    this.setState({
-      activePath: `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`,
+    const isMultiple = evt.ctrlKey;
+    this.setState(({ activePaths }) => ({
+      activePaths: isMultiple
+        ? [...activePaths, `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`]
+        : [`${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`],
       activeNodes: [],
-    });
+    }));
   }
 
   _onKeyDownContainer({ keyCode }) {
     const {
       _removeNode,
       _disconnect,
-      state: { activeNodes, activePath },
+      state: { activeNodes, activePaths },
     } = this;
     if (keyCode === 46 && activeNodes.length) {
       return _removeNode(...activeNodes);
     }
-    if (keyCode === 46 && activePath) {
-      const [fromNodeId, fromOutIdx, toNodeId, toInIdx] = activePath
-        .split(',')
-        .map((v, i) => (i % 2 === 1 ? parseInt(v, 10) : v));
-      _disconnect(fromNodeId, fromOutIdx, toNodeId, toInIdx);
+    if (keyCode === 46 && activePaths.length) {
+      activePaths
+        .map(path =>
+          path.split(',').map((v, i) => (i % 2 === 1 ? parseInt(v, 10) : v)),
+        )
+        .forEach(([fromNodeId, fromOutIdx, toNodeId, toInIdx]) =>
+          _disconnect(fromNodeId, fromOutIdx, toNodeId, toInIdx),
+        );
     }
   }
 }
