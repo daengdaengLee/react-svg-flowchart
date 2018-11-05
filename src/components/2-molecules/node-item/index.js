@@ -28,8 +28,10 @@ class NodeItem extends Component {
         y,
         id,
         name,
+        active,
         inCount,
         outCount,
+        onClickNode,
         onMouseDownNode,
         onMouseDownOut,
         onMouseUpIn,
@@ -40,12 +42,13 @@ class NodeItem extends Component {
       <g
         transform={`translate(${x}, ${y})`}
         onMouseDown={() => onMouseDownNode(id)}
+        onClick={evt => onClickNode(evt, id)}
       >
         <rect
           width="140"
           height="60"
           fill="#ffffff"
-          stroke="black"
+          stroke={active ? 'green' : 'black'}
           cursor="pointer"
         />
         <foreignObject x="10" y="20" width="140" height="20">
@@ -94,10 +97,7 @@ class NodeItem extends Component {
             cy="60"
             fill={hover === `out_${i}` ? 'green' : 'black'}
             cursor="pointer"
-            onMouseDown={evt => {
-              evt.stopPropagation();
-              onMouseDownOut(id, i);
-            }}
+            onMouseDown={evt => onMouseDownOut(evt, id, i)}
             onMouseOver={() => _onHoverInOut('out', i)}
             onMouseLeave={_onHoverOut}
           />
@@ -140,10 +140,12 @@ NodeItem.defaultProps = {
   x: 0,
   y: 0,
   name: 'Node',
+  active: false,
   inCount: 1,
   outCount: 1,
+  onClickNode: (evt, id) => {},
   onMouseDownNode: id => {},
-  onMouseDownOut: (id, outIdx) => {},
+  onMouseDownOut: (evt, id, outIdx) => {},
   onMouseUpIn: (id, inIdx) => {},
   onChangeNodeName: (id, name) => {},
 };
@@ -153,8 +155,10 @@ NodeItem.propTypes = {
   y: PropTypes.number,
   id: PropTypes.string.isRequired,
   name: PropTypes.string,
+  active: PropTypes.bool,
   inCount: PropTypes.number,
   outCount: PropTypes.number,
+  onClickNode: PropTypes.func,
   onMouseDownNode: PropTypes.func,
   onMouseDownOut: PropTypes.func,
   onMouseUpIn: PropTypes.func,

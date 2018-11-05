@@ -32,6 +32,7 @@ class Editor extends Component {
       connectNodeId: null,
       connectOutIdx: null,
       activePath: null,
+      activeNode: null,
     };
     this._container = React.createRef();
     this._onDrop = this._onDrop.bind(this);
@@ -47,6 +48,7 @@ class Editor extends Component {
     this._onMouseLeaveSvg = this._onMouseLeaveSvg.bind(this);
     this._onClickSvg = this._onClickSvg.bind(this);
     this._onClickPath = this._onClickPath.bind(this);
+    this._onClickNodeItem = this._onClickNodeItem.bind(this);
   }
 
   render() {
@@ -63,7 +65,8 @@ class Editor extends Component {
       _onMouseLeaveSvg,
       _onClickSvg,
       _onClickPath,
-      state: { allNodeIds, nodesById, activePath },
+      _onClickNodeItem,
+      state: { allNodeIds, nodesById, activePath, activeNode },
     } = this;
     const connects = allNodeIds
       .map(id => {
@@ -140,10 +143,12 @@ class Editor extends Component {
                 key={id}
                 id={id}
                 name={node.name}
+                active={node.id === activeNode}
                 x={node.x}
                 y={node.y}
                 inCount={node.inCount}
                 outCount={node.outCount}
+                onClickNode={_onClickNodeItem}
                 onMouseDownNode={_movingStart}
                 onMouseDownOut={_connectStart}
                 onMouseUpIn={_connect}
@@ -216,7 +221,9 @@ class Editor extends Component {
     this.setState({ movingId: null });
   }
 
-  _connectStart(nodeId, outIdx) {
+  _connectStart(evt, nodeId, outIdx) {
+    evt.nativeEvent.stopImmediatePropagation();
+    evt.stopPropagation();
     this.setState({ connectNodeId: nodeId, connectOutIdx: outIdx });
   }
 
@@ -288,13 +295,21 @@ class Editor extends Component {
   _onClickSvg() {
     this.setState({
       activePath: null,
+      activeNode: null,
     });
+  }
+
+  _onClickNodeItem(evt, id) {
+    evt.nativeEvent.stopImmediatePropagation();
+    evt.stopPropagation();
+    this.setState({ activePath: null, activeNode: id });
   }
 
   _onClickPath(evt, fromNodeId, fromOutIdx, toNodeId, toInIdx) {
     evt.stopPropagation();
     this.setState({
       activePath: `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`,
+      activeNode: null,
     });
   }
 }
