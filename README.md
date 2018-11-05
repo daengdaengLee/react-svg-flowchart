@@ -1,3 +1,3 @@
-# SVG Test
+# React SVG Flowchart
 
-> SVG test project using react.js
+> Flow chart editor using react.js and svg
