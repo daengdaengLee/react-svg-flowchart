@@ -32,9 +32,11 @@ class Editor extends Component {
       connectNodeId: null,
       connectOutIdx: null,
       activePath: null,
-      activeNode: null,
+      activeNodes: [],
       posX: 0,
       posY: 0,
+      selectionX: null,
+      selectionY: null,
     };
     this._container = React.createRef();
     this._calcPreviewPath = this._calcPreviewPath.bind(this);
@@ -49,10 +51,13 @@ class Editor extends Component {
     this._disconnect = this._disconnect.bind(this);
     this._connectEnd = this._connectEnd.bind(this);
     this._changeNodeName = this._changeNodeName.bind(this);
+    this._selectStart = this._selectStart.bind(this);
+    this._select = this._select.bind(this);
+    this._selectEnd = this._selectEnd.bind(this);
+    this._onMouseDownSvg = this._onMouseDownSvg.bind(this);
     this._onMouseMoveSvg = this._onMouseMoveSvg.bind(this);
     this._onMouseUpSvg = this._onMouseUpSvg.bind(this);
     this._onMouseLeaveSvg = this._onMouseLeaveSvg.bind(this);
-    this._onClickSvg = this._onClickSvg.bind(this);
     this._onClickPath = this._onClickPath.bind(this);
     this._onClickNodeItem = this._onClickNodeItem.bind(this);
     this._onKeyDownContainer = this._onKeyDownContainer.bind(this);
@@ -68,10 +73,10 @@ class Editor extends Component {
       _connectStart,
       _connect,
       _changeNodeName,
+      _onMouseDownSvg,
       _onMouseMoveSvg,
       _onMouseUpSvg,
       _onMouseLeaveSvg,
-      _onClickSvg,
       _onClickPath,
       _onClickNodeItem,
       _onKeyDownContainer,
@@ -79,9 +84,13 @@ class Editor extends Component {
         allNodeIds,
         nodesById,
         activePath,
-        activeNode,
+        activeNodes,
         connectNodeId,
         connectOutIdx,
+        selectionX,
+        selectionY,
+        posX,
+        posY,
       },
     } = this;
     const connects = allNodeIds
@@ -125,7 +134,7 @@ class Editor extends Component {
           onMouseLeave={_onMouseLeaveSvg}
           onMouseUp={_onMouseUpSvg}
           onMouseMove={_onMouseMoveSvg}
-          onClick={_onClickSvg}
+          onMouseDown={_onMouseDownSvg}
         >
           {connects.map(connect => (
             <path
@@ -153,6 +162,8 @@ class Editor extends Component {
                   connect.toInIdx,
                 )
               }
+              onMouseUp={evt => evt.stopPropagation()}
+              onMouseDown={evt => evt.stopPropagation()}
             />
           ))}
           {allNodeIds.map(id => {
@@ -162,7 +173,7 @@ class Editor extends Component {
                 key={id}
                 id={id}
                 name={node.name}
-                active={node.id === activeNode}
+                active={activeNodes.includes(node.id)}
                 x={node.x}
                 y={node.y}
                 inCount={node.inCount}
@@ -183,6 +194,19 @@ class Editor extends Component {
               stroke="black"
               strokeWidth="2"
               strokeDasharray="4 4"
+            />
+          )}
+          {selectionX != null &&
+            selectionY != null && (
+            <rect
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+              x={selectionX < posX ? selectionX : posX}
+              y={selectionY < posY ? selectionY : posY}
+              width={Math.abs(selectionX - posX)}
+              height={Math.abs(selectionY - posY)}
             />
           )}
         </svg>
@@ -247,43 +271,46 @@ class Editor extends Component {
     console.log('[NODE] make');
   }
 
-  _removeNode(id) {
-    this.setState(
-      ({
-        allNodeIds,
-        nodesById: { [id]: deleted, ...restNodesById },
-        activeNode,
-      }) => {
-        const filteredIds = allNodeIds.filter(nodeId => nodeId !== id);
-        const connectedNodeIds = filteredIds.filter(nodeId => {
-          const node = restNodesById[nodeId];
-          return node.connects.find(
-            connect => connect.fromNodeId === id || connect.toNodeId === id,
-          );
-        });
-        const disconnectNodes = connectedNodeIds.reduce((nodes, nodeId) => {
-          const node = restNodesById[nodeId];
-          return {
-            ...nodes,
-            [nodeId]: {
-              ...node,
-              connects: node.connects.filter(
-                connect => connect.fromNodeId !== id && connect.toNodeId !== id,
-              ),
-            },
-          };
-        }, {});
+  _removeNode(...ids) {
+    this.setState(({ allNodeIds, nodesById, activeNodes }) => {
+      const filteredIds = allNodeIds.filter(nodeId => !ids.includes(nodeId));
+      const restNodesById = filteredIds.reduce(
+        (nodes, nodeId) => ({ ...nodes, [nodeId]: nodesById[nodeId] }),
+        {},
+      );
+      const connectedNodeIds = filteredIds.filter(nodeId => {
+        const node = nodesById[nodeId];
+        return node.connects.find(
+          connect =>
+            ids.includes(connect.fromNodeId) || ids.includes(connect.toNodeId),
+        );
+      });
+      const disconnectNodes = connectedNodeIds.reduce((nodes, nodeId) => {
+        const node = nodesById[nodeId];
         return {
-          activeNode: activeNode === id ? null : activeNode,
-          allNodeIds: filteredIds,
-          nodesById: { ...restNodesById, ...disconnectNodes },
+          ...nodes,
+          [nodeId]: {
+            ...node,
+            connects: node.connects.filter(
+              connect =>
+                !ids.includes(connect.fromNodeId) &&
+                !ids.includes(connect.toNodeId),
+            ),
+          },
         };
-      },
-    );
+      }, {});
+      return {
+        activeNodes: activeNodes.filter(nodeId => !ids.includes(nodeId)),
+        allNodeIds: filteredIds,
+        nodesById: { ...restNodesById, ...disconnectNodes },
+      };
+    });
     console.log('[NODE] remove');
   }
 
-  _movingStart(id) {
+  _movingStart(evt, id) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
     this.setState({ movingId: id });
   }
 
@@ -311,7 +338,9 @@ class Editor extends Component {
     this.setState({ connectNodeId: nodeId, connectOutIdx: outIdx });
   }
 
-  _connect(toNodeId, inIdx) {
+  _connect(evt, toNodeId, inIdx) {
+    evt.stopPropagation();
+    evt.nativeEvent.stopImmediatePropagation();
     const {
       state: { connectNodeId: fromNodeId, connectOutIdx: outIdx, nodesById },
     } = this;
@@ -339,6 +368,8 @@ class Editor extends Component {
           connects: [...node.connects, connect],
         },
       },
+      connectNodeId: null,
+      connectOutIdx: null,
     }));
     console.log('[NODE] connect');
   }
@@ -381,6 +412,45 @@ class Editor extends Component {
     });
   }
 
+  _selectStart(selectionX, selectionY) {
+    this.setState({ selectionX, selectionY });
+  }
+
+  _select(fromX, fromY, toX, toY) {
+    const { allNodeIds, nodesById } = this.state;
+    const selectedIds = allNodeIds.filter(nodeId => {
+      const node = nodesById[nodeId];
+      if (!node) return false;
+      return node.x > fromX && node.x < toX && node.y > fromY && node.y < toY;
+    });
+    this.setState({ activeNodes: selectedIds });
+    console.log('[NODE] select');
+  }
+
+  _selectEnd(x, y) {
+    if (x != null || y != null) {
+      const {
+        _select,
+        state: { selectionX: fromX, selectionY: fromY },
+      } = this;
+      fromX == null || fromY == null || _select(fromX, fromY, x, y);
+    }
+    this.setState({ selectionX: null, selectionY: null });
+  }
+
+  _onMouseDownSvg({ clientX, clientY }) {
+    const {
+      _container: { current: containerEl },
+      _selectStart,
+    } = this;
+    this.setState({ activePath: null, activeNodes: [] });
+    if (!containerEl) return;
+    const { offsetLeft, offsetTop } = containerEl;
+    const x = clientX - offsetLeft;
+    const y = clientY - offsetTop;
+    isNaN(x) || isNaN(y) || _selectStart(x, y);
+  }
+
   _onMouseMoveSvg({ movementX, movementY, clientX, clientY }) {
     const {
       _moving,
@@ -395,36 +465,40 @@ class Editor extends Component {
     _moving(movementX, movementY);
   }
 
-  _onMouseUpSvg() {
-    const { _movingEnd, _connectEnd } = this;
+  _onMouseUpSvg({ clientX, clientY }) {
+    const {
+      _container: { current: containerEl },
+      _movingEnd,
+      _connectEnd,
+      _selectEnd,
+    } = this;
     _movingEnd();
     _connectEnd();
+    if (!containerEl) return;
+    const { offsetLeft, offsetTop } = containerEl;
+    const x = clientX - offsetLeft;
+    const y = clientY - offsetTop;
+    isNaN(x) || isNaN(y) || _selectEnd(x, y);
   }
 
   _onMouseLeaveSvg() {
-    const { _movingEnd, _connectEnd } = this;
+    const { _movingEnd, _connectEnd, _selectEnd } = this;
     _movingEnd();
     _connectEnd();
-  }
-
-  _onClickSvg() {
-    this.setState({
-      activePath: null,
-      activeNode: null,
-    });
+    _selectEnd(null, null);
   }
 
   _onClickNodeItem(evt, id) {
     evt.nativeEvent.stopImmediatePropagation();
     evt.stopPropagation();
-    this.setState({ activePath: null, activeNode: id });
+    this.setState({ activePath: null, activeNodes: [id] });
   }
 
   _onClickPath(evt, fromNodeId, fromOutIdx, toNodeId, toInIdx) {
     evt.stopPropagation();
     this.setState({
       activePath: `${fromNodeId},${fromOutIdx},${toNodeId},${toInIdx}`,
-      activeNode: null,
+      activeNodes: [],
     });
   }
 
@@ -432,10 +506,10 @@ class Editor extends Component {
     const {
       _removeNode,
       _disconnect,
-      state: { activeNode, activePath },
+      state: { activeNodes, activePath },
     } = this;
-    if (keyCode === 46 && activeNode) {
-      return _removeNode(activeNode);
+    if (keyCode === 46 && activeNodes.length) {
+      return _removeNode(...activeNodes);
     }
     if (keyCode === 46 && activePath) {
       const [fromNodeId, fromOutIdx, toNodeId, toInIdx] = activePath

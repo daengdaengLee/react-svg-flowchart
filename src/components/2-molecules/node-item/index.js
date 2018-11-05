@@ -41,7 +41,7 @@ class NodeItem extends Component {
     return (
       <g
         transform={`translate(${x}, ${y})`}
-        onMouseDown={() => onMouseDownNode(id)}
+        onMouseDown={evt => onMouseDownNode(evt, id)}
         onClick={evt => onClickNode(evt, id)}
       >
         <rect
@@ -84,7 +84,7 @@ class NodeItem extends Component {
             cx={(140 / (inCount + 1)) * (i + 1)}
             fill={hover === `in_${i}` ? 'green' : 'black'}
             cursor="pointer"
-            onMouseUp={() => onMouseUpIn(id, i)}
+            onMouseUp={evt => onMouseUpIn(evt, id, i)}
             onMouseOver={() => _onHoverInOut('in', i)}
             onMouseLeave={_onHoverOut}
           />
@@ -144,9 +144,9 @@ NodeItem.defaultProps = {
   inCount: 1,
   outCount: 1,
   onClickNode: (evt, id) => {},
-  onMouseDownNode: id => {},
+  onMouseDownNode: (evt, id) => {},
   onMouseDownOut: (evt, id, outIdx) => {},
-  onMouseUpIn: (id, inIdx) => {},
+  onMouseUpIn: (evt, id, inIdx) => {},
   onChangeNodeName: (id, name) => {},
 };
 
