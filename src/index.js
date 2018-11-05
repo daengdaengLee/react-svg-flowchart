@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 import { createGlobalStyle } from 'styled-components';
 import reset from 'styled-reset';
+import Composer from './components/4-pages/composer';
 import ManySvgNode from './components/4-pages/many-svg-node';
 import * as serviceWorker from './serviceWorker';
 
@@ -26,7 +27,8 @@ ReactDOM.render(
           path="/many-svg-node"
           render={() => <ManySvgNode rowCount={100} colCount={16} />}
         />
-        <Redirect to="/many-svg-node" />
+        <Route path="/composer" component={Composer} />
+        <Redirect to="/composer" />
       </Switch>
       <GlobalStyle />
     </Fragment>
