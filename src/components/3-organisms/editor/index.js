@@ -33,8 +33,11 @@ class Editor extends Component {
       connectOutIdx: null,
       activePath: null,
       activeNode: null,
+      posX: 0,
+      posY: 0,
     };
     this._container = React.createRef();
+    this._calcPreviewPath = this._calcPreviewPath.bind(this);
     this._onDrop = this._onDrop.bind(this);
     this._makeNode = this._makeNode.bind(this);
     this._removeNode = this._removeNode.bind(this);
@@ -58,6 +61,7 @@ class Editor extends Component {
   render() {
     const {
       _container,
+      _calcPreviewPath,
       _onDragOver,
       _onDrop,
       _movingStart,
@@ -71,7 +75,14 @@ class Editor extends Component {
       _onClickPath,
       _onClickNodeItem,
       _onKeyDownContainer,
-      state: { allNodeIds, nodesById, activePath, activeNode },
+      state: {
+        allNodeIds,
+        nodesById,
+        activePath,
+        activeNode,
+        connectNodeId,
+        connectOutIdx,
+      },
     } = this;
     const connects = allNodeIds
       .map(id => {
@@ -163,9 +174,37 @@ class Editor extends Component {
               />
             );
           })}
+          {connectNodeId != null &&
+            connectOutIdx != null && (
+            <path
+              d={_calcPreviewPath()}
+              fill="none"
+              stroke="black"
+              strokeDasharray="4 4"
+            />
+          )}
         </svg>
       </div>
     );
+  }
+
+  _calcPreviewPath() {
+    const {
+      connectNodeId: fromNodeId,
+      connectOutIdx: fromOutIdx,
+      nodesById,
+      posX,
+      posY,
+    } = this.state;
+    const node = nodesById[fromNodeId];
+    if (!node) return 'M 0, 0';
+    const fromX = node.x + (140 / (node.outCount + 1)) * (fromOutIdx + 1);
+    const fromY = node.y + 60;
+    return fromY < posY
+      ? `M ${fromX} ${fromY} C ${fromX} ${posY}, ${posX} ${fromY}, ${posX} ${posY}`
+      : `M ${fromX} ${fromY} C ${(fromX + posX) / 2} ${fromY * 1.5 -
+          posY * 0.5}, ${(fromX + posX) / 2} ${posY * 1.5 -
+          fromY * 0.5}, ${posX} ${posY}`;
   }
 
   _onDragOver(evt) {
@@ -340,8 +379,17 @@ class Editor extends Component {
     });
   }
 
-  _onMouseMoveSvg({ movementX, movementY }) {
-    const { _moving } = this;
+  _onMouseMoveSvg({ movementX, movementY, clientX, clientY }) {
+    const {
+      _moving,
+      _container: { current: containerEl },
+    } = this;
+    if (containerEl) {
+      const { offsetLeft, offsetTop } = containerEl;
+      const posX = clientX - offsetLeft;
+      const posY = clientY - offsetTop;
+      isNaN(posX) || isNaN(posY) || this.setState({ posX, posY });
+    }
     _moving(movementX, movementY);
   }
 
