@@ -1,5 +1,11 @@
 import React, { Fragment } from 'react';
 import ReactDOM from 'react-dom';
+import {
+  HashRouter as Router,
+  Route,
+  Switch,
+  Redirect,
+} from 'react-router-dom';
 import { createGlobalStyle } from 'styled-components';
 import reset from 'styled-reset';
 import ManySvgNode from './components/4-pages/many-svg-node';
@@ -13,10 +19,18 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 ReactDOM.render(
-  <Fragment>
-    <ManySvgNode rowCount={100} colCount={16} />
-    <GlobalStyle />
-  </Fragment>,
+  <Router>
+    <Fragment>
+      <Switch>
+        <Route
+          path="/many-svg-node"
+          render={() => <ManySvgNode rowCount={100} colCount={16} />}
+        />
+        <Redirect to="/many-svg-node" />
+      </Switch>
+      <GlobalStyle />
+    </Fragment>
+  </Router>,
   document.getElementById('root'),
 );
 
