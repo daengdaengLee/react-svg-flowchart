@@ -94,7 +94,10 @@ class NodeItem extends Component {
             cy="60"
             fill={hover === `out_${i}` ? 'green' : 'black'}
             cursor="pointer"
-            onMouseDown={() => onMouseDownOut(id, i)}
+            onMouseDown={evt => {
+              evt.stopPropagation();
+              onMouseDownOut(id, i);
+            }}
             onMouseOver={() => _onHoverInOut('out', i)}
             onMouseLeave={_onHoverOut}
           />
