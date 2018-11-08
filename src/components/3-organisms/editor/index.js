@@ -2,6 +2,11 @@ import React, { Component } from 'react';
 import { _pipe } from '../../../assets/js/utils';
 import NodeItem from '../../2-molecules/node-item';
 
+const _calcPointToSvgCoord = (x, y, tx, ty, s) => [
+  x * (1 / s) - tx,
+  y * (1 / s) - ty,
+];
+
 const _calcPath = (fromX, fromY, toX, toY) => {
   const middleX = (fromX + toX) / 2;
   const y1 = fromY * 1.5 - toY * 0.5;
@@ -101,11 +106,16 @@ const _movingStart = prevState => ({ ...prevState, moving: true });
 const _moving = (movementX, movementY) => prevState => {
   const { activeNodes, nodesById, moving } = prevState;
   if (!moving || !activeNodes.length) return prevState;
+  const { zoomK } = prevState;
   const movedNodes = activeNodes.reduce((nodes, nodeId) => {
     const node = nodesById[nodeId];
     return {
       ...nodes,
-      [nodeId]: { ...node, x: node.x + movementX, y: node.y + movementY },
+      [nodeId]: {
+        ...node,
+        x: node.x + movementX * (1 / zoomK),
+        y: node.y + movementY * (1 / zoomK),
+      },
     };
   }, {});
   return {
@@ -207,19 +217,46 @@ const _changeNodeName = (id, name) => prevState => {
 
 const _changeNodeNameEnd = prevState => ({ ...prevState, editingId: null });
 
-const _selectStart = (selectionX, selectionY) => prevState => ({
-  ...prevState,
-  selectionX,
-  selectionY,
-});
+const _selectStart = (selectionX, selectionY) => prevState => {
+  const { panning } = prevState;
+  return panning
+    ? prevState
+    : {
+      ...prevState,
+      selectionX,
+      selectionY,
+    };
+};
 
 const _selectArea = (x2, y2) => prevState => {
-  const { selectionX: x1, selectionY: y1, allNodeIds, nodesById } = prevState;
+  const {
+    selectionX: x1,
+    selectionY: y1,
+    allNodeIds,
+    nodesById,
+    panningX,
+    panningY,
+    zoomK,
+  } = prevState;
   if (x1 == null || y1 == null) return prevState;
-  const minX = x1 < x2 ? x1 : x2;
-  const maxX = x1 < x2 ? x2 : x1;
-  const minY = y1 < y2 ? y1 : y2;
-  const maxY = y1 < y2 ? y2 : y1;
+  const minX0 = x1 < x2 ? x1 : x2;
+  const maxX0 = x1 < x2 ? x2 : x1;
+  const minY0 = y1 < y2 ? y1 : y2;
+  const maxY0 = y1 < y2 ? y2 : y1;
+  const [minX, minY] = _calcPointToSvgCoord(
+    minX0,
+    minY0,
+    panningX,
+    panningY,
+    zoomK,
+  );
+  const [maxX, maxY] = _calcPointToSvgCoord(
+    maxX0,
+    maxY0,
+    panningX,
+    panningY,
+    zoomK,
+  );
   return {
     ...prevState,
     activeNodes: allNodeIds.filter(nodeId => {
@@ -238,6 +275,39 @@ const _selectEnd = prevState => ({
 
 const _movePosXY = (posX, posY) => prevState => ({ ...prevState, posX, posY });
 
+const _panningStart = ctrlKey => prevState => ({
+  ...prevState,
+  panning: ctrlKey,
+});
+
+const _panning = (movementX, movementY) => prevState => {
+  const {
+    panning,
+    panningX: prevPanningX,
+    panningY: prevPanningY,
+    zoomK,
+  } = prevState;
+  return panning
+    ? {
+      ...prevState,
+      panningX: prevPanningX + movementX * (1 / zoomK),
+      panningY: prevPanningY + movementY * (1 / zoomK),
+    }
+    : prevState;
+};
+
+const _panningEnd = prevState => ({ ...prevState, panning: false });
+
+const _zooming = (ctrlKey, delta) => prevState => {
+  if (ctrlKey) {
+    const { zoomK: prevZoomK } = prevState;
+    const newZoomK = prevZoomK + delta;
+    const zoomK = newZoomK < 1 || newZoomK > 10 ? prevState.zoomK : newZoomK;
+    return { ...prevState, zoomK };
+  }
+  return prevState;
+};
+
 class Editor extends Component {
   constructor(props) {
     super(props);
@@ -254,6 +324,11 @@ class Editor extends Component {
       posY: 0,
       selectionX: null,
       selectionY: null,
+      panning: false,
+      panningX: 0,
+      panningY: 0,
+      zooming: false,
+      zoomK: 1,
     };
     this._container = React.createRef();
     this._calcPreviewPath = this._calcPreviewPath.bind(this);
@@ -268,6 +343,7 @@ class Editor extends Component {
     this._onMouseUpSvg = this._onMouseUpSvg.bind(this);
     this._onMouseLeaveSvg = this._onMouseLeaveSvg.bind(this);
     this._onMouseDownPath = this._onMouseDownPath.bind(this);
+    this._onWheel = this._onWheel.bind(this);
     this._onKeyDownContainer = this._onKeyDownContainer.bind(this);
   }
 
@@ -288,6 +364,7 @@ class Editor extends Component {
       _onMouseUpSvg,
       _onMouseLeaveSvg,
       _onMouseDownPath,
+      _onWheel,
       _onKeyDownContainer,
       state: {
         allNodeIds,
@@ -301,6 +378,9 @@ class Editor extends Component {
         selectionY,
         posX,
         posY,
+        panningX,
+        panningY,
+        zoomK,
       },
     } = this;
     const connects = allNodeIds
@@ -330,6 +410,17 @@ class Editor extends Component {
         (allConnects, nodeConnects) => [...allConnects, ...nodeConnects],
         [],
       );
+    const selectRectX0 = selectionX < posX ? selectionX : posX;
+    const selectRectY0 = selectionY < posY ? selectionY : posY;
+    const [selectRectX, selectRectY] = _calcPointToSvgCoord(
+      selectRectX0,
+      selectRectY0,
+      panningX,
+      panningY,
+      zoomK,
+    );
+    const selectRectWidth = Math.abs(selectionX - posX) * (1 / zoomK);
+    const selectRectHeight = Math.abs(selectionY - posY) * (1 / zoomK);
     return (
       <div
         ref={_container}
@@ -345,81 +436,87 @@ class Editor extends Component {
           onMouseUp={_onMouseUpSvg}
           onMouseMove={_onMouseMoveSvg}
           onMouseDown={_onMouseDownSvg}
+          onWheel={_onWheel}
         >
-          {connects.map(connect => (
-            <path
-              key={`${connect.fromNodeId},${connect.fromOutIdx},${
-                connect.toNodeId
-              },${connect.toInIdx}`}
-              d={_calcConnectPath(connect)}
-              stroke={
-                activePaths.includes(
-                  `${connect.fromNodeId},${connect.fromOutIdx},${
-                    connect.toNodeId
-                  },${connect.toInIdx}`,
-                )
-                  ? 'green'
-                  : 'black'
-              }
-              strokeWidth="2"
-              fill="none"
-              cursor="pointer"
-              onMouseDown={evt =>
-                _onMouseDownPath(
-                  evt,
-                  connect.fromNodeId,
-                  connect.fromOutIdx,
-                  connect.toNodeId,
-                  connect.toInIdx,
-                )
-              }
-              onMouseUp={evt => evt.stopPropagation()}
-            />
-          ))}
-          {allNodeIds.map(id => {
-            const node = nodesById[id];
-            return (
-              <NodeItem
-                key={id}
-                id={id}
-                name={node.name}
-                active={activeNodes.includes(node.id)}
-                editing={editingId === node.id}
-                x={node.x}
-                y={node.y}
-                inCount={node.inCount}
-                outCount={node.outCount}
-                onMouseDownNode={_onMouseDownNode}
-                onMouseDownOut={_onMouseDownOut}
-                onMouseUpIn={_onMouseUpIn}
-                onDoubleClickNodeName={_onDoubleClickNodeName}
-                onChangeNodeName={_onChangeNodeName}
+          <g
+            transform={`matrix(${zoomK},0,0,${zoomK},${zoomK *
+              panningX},${zoomK * panningY})`}
+          >
+            {connects.map(connect => (
+              <path
+                key={`${connect.fromNodeId},${connect.fromOutIdx},${
+                  connect.toNodeId
+                },${connect.toInIdx}`}
+                d={_calcConnectPath(connect)}
+                stroke={
+                  activePaths.includes(
+                    `${connect.fromNodeId},${connect.fromOutIdx},${
+                      connect.toNodeId
+                    },${connect.toInIdx}`,
+                  )
+                    ? 'green'
+                    : 'black'
+                }
+                strokeWidth="2"
+                fill="none"
+                cursor="pointer"
+                onMouseDown={evt =>
+                  _onMouseDownPath(
+                    evt,
+                    connect.fromNodeId,
+                    connect.fromOutIdx,
+                    connect.toNodeId,
+                    connect.toInIdx,
+                  )
+                }
+                onMouseUp={evt => evt.stopPropagation()}
               />
-            );
-          })}
-          {connectNodeId != null &&
-            connectOutIdx != null && (
-            <path
-              d={_calcPreviewPath()}
-              fill="none"
-              stroke="black"
-              strokeWidth="2"
-              strokeDasharray="4 4"
-            />
-          )}
-          {selectionX != null &&
-            selectionY != null && (
-            <rect
-              fill="none"
-              stroke="black"
-              strokeWidth="2"
-              strokeDasharray="4 4"
-              x={selectionX < posX ? selectionX : posX}
-              y={selectionY < posY ? selectionY : posY}
-              width={Math.abs(selectionX - posX)}
-              height={Math.abs(selectionY - posY)}
-            />
-          )}
+            ))}
+            {allNodeIds.map(id => {
+              const node = nodesById[id];
+              return (
+                <NodeItem
+                  key={id}
+                  id={id}
+                  name={node.name}
+                  active={activeNodes.includes(node.id)}
+                  editing={editingId === node.id}
+                  x={node.x}
+                  y={node.y}
+                  inCount={node.inCount}
+                  outCount={node.outCount}
+                  onMouseDownNode={_onMouseDownNode}
+                  onMouseDownOut={_onMouseDownOut}
+                  onMouseUpIn={_onMouseUpIn}
+                  onDoubleClickNodeName={_onDoubleClickNodeName}
+                  onChangeNodeName={_onChangeNodeName}
+                />
+              );
+            })}
+            {connectNodeId != null &&
+              connectOutIdx != null && (
+              <path
+                d={_calcPreviewPath()}
+                fill="none"
+                stroke="black"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+              />
+            )}
+            {selectionX != null &&
+              selectionY != null && (
+              <rect
+                fill="none"
+                stroke="black"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+                x={selectRectX}
+                y={selectRectY}
+                width={selectRectWidth}
+                height={selectRectHeight}
+              />
+            )}
+          </g>
         </svg>
       </div>
     );
@@ -447,13 +544,23 @@ class Editor extends Component {
       connectNodeId: fromNodeId,
       connectOutIdx: fromOutIdx,
       nodesById,
-      posX: toX,
-      posY: toY,
+      posX,
+      posY,
+      panningX,
+      panningY,
+      zoomK,
     } = this.state;
     const node = nodesById[fromNodeId];
     if (!node) return 'M 0, 0';
     const fromX = node.x + (140 / (node.outCount + 1)) * (fromOutIdx + 1);
     const fromY = node.y + 60;
+    const [toX, toY] = _calcPointToSvgCoord(
+      posX,
+      posY,
+      panningX,
+      panningY,
+      zoomK,
+    );
     return _calcPath(fromX, fromY, toX, toY);
   }
 
@@ -468,11 +575,13 @@ class Editor extends Component {
     const inoutCount = evt.dataTransfer.getData('inoutCount');
     const {
       _container: { current: containerEl },
+      state: { panningX, panningY, zoomK },
     } = this;
     if (!containerEl || inoutCount.length !== 2) return;
     const { offsetLeft, offsetTop } = containerEl;
-    const x = clientX - offsetLeft;
-    const y = clientY - offsetTop;
+    const x0 = clientX - offsetLeft;
+    const y0 = clientY - offsetTop;
+    const [x, y] = _calcPointToSvgCoord(x0, y0, panningX, panningY, zoomK);
     const [inCount, outCount] = inoutCount.split('').map(v => parseInt(v, 10));
     this.setState(_makeNodes(x, y, inCount, outCount));
     console.log('[NODE] make');
@@ -500,7 +609,7 @@ class Editor extends Component {
     console.log('[NODE] change name');
   }
 
-  _onMouseDownSvg({ clientX, clientY }) {
+  _onMouseDownSvg({ clientX, clientY, ctrlKey }) {
     const {
       _container: {
         current: { offsetLeft, offsetTop },
@@ -512,8 +621,9 @@ class Editor extends Component {
       _pipe(
         _deactivateAllNodes,
         _deactivateAllPaths,
-        _selectStart(fromX, fromY),
         _changeNodeNameEnd,
+        _panningStart(ctrlKey),
+        _selectStart(fromX, fromY),
       ),
     );
   }
@@ -526,7 +636,13 @@ class Editor extends Component {
     } = this;
     const posX = clientX - offsetLeft;
     const posY = clientY - offsetTop;
-    this.setState(_pipe(_movePosXY(posX, posY), _moving(movementX, movementY)));
+    this.setState(
+      _pipe(
+        _movePosXY(posX, posY),
+        _moving(movementX, movementY),
+        _panning(movementX, movementY),
+      ),
+    );
   }
 
   _onMouseUpSvg({ clientX, clientY }) {
@@ -538,7 +654,13 @@ class Editor extends Component {
     const x = clientX - offsetLeft;
     const y = clientY - offsetTop;
     this.setState(
-      _pipe(_movingEnd, _connectEnd, _selectArea(x, y), _selectEnd),
+      _pipe(
+        _movingEnd,
+        _connectEnd,
+        _selectArea(x, y),
+        _selectEnd,
+        _panningEnd,
+      ),
     );
   }
 
@@ -552,6 +674,13 @@ class Editor extends Component {
     this.setState(
       _activatePaths(isAcc, fromNodeId, fromOutIdx, toNodeId, toInIdx),
     );
+  }
+
+  _onWheel(evt) {
+    evt.preventDefault();
+    const { ctrlKey, deltaY } = evt;
+    const delta = deltaY < 0 ? 0.1 : -0.1;
+    this.setState(_zooming(ctrlKey, delta));
   }
 
   _onKeyDownContainer({ keyCode }) {
